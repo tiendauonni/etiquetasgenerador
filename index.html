@@ -149,6 +149,42 @@
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
   @media (max-width:520px){.row2{grid-template-columns:1fr;}}
 
+  .field.hidden{display:none;}
+
+  .tipo-group{
+    display:flex;
+    gap:10px;
+    margin-bottom:16px;
+  }
+  .tipo-option{
+    flex:1;
+    display:flex;
+    align-items:center;
+    gap:9px;
+    border:1.4px solid var(--line);
+    border-radius:10px;
+    padding:11px 13px;
+    cursor:pointer;
+    background:#fbfaf5;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .tipo-option input{
+    accent-color:var(--gold-dim);
+    width:15px;
+    height:15px;
+    flex-shrink:0;
+  }
+  .tipo-option span{
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .tipo-option.active{
+    border-color:var(--gold);
+    background:#fffdf3;
+  }
+
   .actions{
     display:flex;
     gap:10px;
@@ -447,25 +483,33 @@
           <input id="f-orden" type="text" placeholder="Ej: 1042" maxlength="20">
         </div>
 
-        <div class="row2">
-          <div class="field">
-            <label>Nombre <span class="req">*</span></label>
-            <input id="f-nombre" type="text" placeholder="Ej: Abril">
-          </div>
-          <div class="field">
-            <label>Apellido <span class="req">*</span></label>
-            <input id="f-apellido" type="text" placeholder="Ej: Gómez">
+        <div class="field">
+          <label>Tipo de entrega <span class="req">*</span></label>
+          <div class="tipo-group" id="tipoGroup">
+            <label class="tipo-option active" data-value="envio">
+              <input type="radio" name="f-tipo" value="envio" checked>
+              <span>Envío</span>
+            </label>
+            <label class="tipo-option" data-value="retiro">
+              <input type="radio" name="f-tipo" value="retiro">
+              <span>Retiro en local</span>
+            </label>
           </div>
         </div>
 
         <div class="field">
-          <label>Dirección <span class="req">*</span></label>
-          <input id="f-direccion" type="text" placeholder="Calle, número, piso/depto, localidad">
+          <label>Nombre y apellido <span class="req">*</span></label>
+          <input id="f-nombre" type="text" placeholder="Ej: Abril Gómez">
         </div>
 
         <div class="field">
           <label>Teléfono</label>
           <input id="f-telefono" type="text" placeholder="Ej: 11 2345 6789">
+        </div>
+
+        <div class="field" id="fieldDireccion">
+          <label>Dirección <span class="req">*</span></label>
+          <input id="f-direccion" type="text" placeholder="Calle, número, piso/depto, localidad">
         </div>
 
         <div class="field">
@@ -522,9 +566,8 @@
   const inputs = {
     orden: $('f-orden'),
     nombre: $('f-nombre'),
-    apellido: $('f-apellido'),
-    direccion: $('f-direccion'),
     telefono: $('f-telefono'),
+    direccion: $('f-direccion'),
     comentarios: $('f-comentarios'),
   };
 
@@ -532,13 +575,33 @@
   let editingId = null;
   let nextId = 1;
 
+  function getTipo(){
+    const checked = document.querySelector('input[name="f-tipo"]:checked');
+    return checked ? checked.value : 'envio';
+  }
+
+  function setTipo(value){
+    document.querySelectorAll('input[name="f-tipo"]').forEach(r => {
+      r.checked = (r.value === value);
+    });
+    updateTipoUI();
+  }
+
+  function updateTipoUI(){
+    const tipo = getTipo();
+    document.querySelectorAll('.tipo-option').forEach(opt => {
+      opt.classList.toggle('active', opt.dataset.value === tipo);
+    });
+    $('fieldDireccion').classList.toggle('hidden', tipo === 'retiro');
+  }
+
   function readForm(){
     return {
       orden: inputs.orden.value.trim(),
+      tipo: getTipo(),
       nombre: inputs.nombre.value.trim(),
-      apellido: inputs.apellido.value.trim(),
-      direccion: inputs.direccion.value.trim(),
       telefono: inputs.telefono.value.trim(),
+      direccion: inputs.direccion.value.trim(),
       comentarios: inputs.comentarios.value.trim(),
     };
   }
@@ -550,14 +613,19 @@
   }
 
   function labelHTML(order){
-    const nombreCompleto = [order.nombre, order.apellido].filter(Boolean).join(' ');
     const ordenTxt = order.orden ? '#' + order.orden : '—';
+    const esRetiro = order.tipo === 'retiro';
     const val = (v, ph) => v ? `<p class="v">${escapeHtml(v)}</p>` : `<p class="v empty">${ph}</p>`;
+    const direccionBlock = esRetiro ? '' : `
+        <div class="field-line">
+          <p class="k">Dirección</p>
+          ${val(order.direccion, 'Dirección de entrega')}
+        </div>`;
     return `
       <div class="label-inner">
         <div class="label-band">
           <img class="logo" src="${LOGO}" alt="uonni">
-          <div class="status-chip">Motomensajería</div>
+          <div class="status-chip">${esRetiro ? 'Retiro en local' : 'Motomensajería'}</div>
         </div>
         <div class="greeting">
           <p class="hola">¡Hola!<span>&nbsp;Llegué :)</span></p>
@@ -566,12 +634,8 @@
         <div class="divider"></div>
         <div class="field-line">
           <p class="k">Destinatario</p>
-          ${val(nombreCompleto, 'Nombre y apellido')}
-        </div>
-        <div class="field-line">
-          <p class="k">Dirección</p>
-          ${val(order.direccion, 'Dirección de entrega')}
-        </div>
+          ${val(order.nombre, 'Nombre y apellido')}
+        </div>${direccionBlock}
         <div class="field-line">
           <div class="two-up">
             <div>
@@ -623,8 +687,8 @@
     empty.style.display = 'none';
 
     list.innerHTML = queue.map((o, i) => {
-      const nombreCompleto = [o.nombre, o.apellido].filter(Boolean).join(' ') || 'Sin nombre';
-      const dir = o.direccion || 'Sin dirección';
+      const nombreCompleto = o.nombre || 'Sin nombre';
+      const dir = o.tipo === 'retiro' ? 'Retiro en local' : (o.direccion || 'Sin dirección');
       return `
         <div class="queue-card" data-id="${o.id}">
           <div class="qnum">${o.orden ? '#' + escapeHtml(o.orden) : (i+1)}</div>
@@ -643,6 +707,7 @@
 
   function clearForm(){
     Object.values(inputs).forEach(el => el.value = '');
+    setTipo('envio');
     editingId = null;
     $('btn-add').textContent = 'Agregar a la lista';
     $('formTitle').innerHTML = 'Datos del pedido';
@@ -652,10 +717,10 @@
 
   function loadIntoForm(order){
     inputs.orden.value = order.orden;
+    setTipo(order.tipo || 'envio');
     inputs.nombre.value = order.nombre;
-    inputs.apellido.value = order.apellido;
-    inputs.direccion.value = order.direccion;
     inputs.telefono.value = order.telefono;
+    inputs.direccion.value = order.direccion;
     inputs.comentarios.value = order.comentarios;
     editingId = order.id;
     $('btn-add').textContent = 'Guardar cambios';
@@ -666,11 +731,20 @@
   }
 
   Object.values(inputs).forEach(el => el.addEventListener('input', renderPreview));
+  document.querySelectorAll('input[name="f-tipo"]').forEach(r => {
+    r.addEventListener('change', () => {
+      updateTipoUI();
+      renderPreview();
+    });
+  });
 
   $('btn-add').addEventListener('click', () => {
     const data = readForm();
-    if(!data.orden || !data.nombre || !data.apellido || !data.direccion){
-      alert('Completá al menos número de orden, nombre, apellido y dirección antes de agregar el pedido.');
+    const faltaDireccion = data.tipo === 'envio' && !data.direccion;
+    if(!data.orden || !data.nombre || faltaDireccion){
+      alert(faltaDireccion
+        ? 'Completá al menos número de orden, nombre y apellido, y dirección (requerida para envío) antes de agregar el pedido.'
+        : 'Completá al menos número de orden y nombre y apellido antes de agregar el pedido.');
       return;
     }
     if(editingId){
